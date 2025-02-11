@@ -1,11 +1,11 @@
 use cgmath::*;
-use std::f32::consts::FRAC_PI_2;
-use std::time::Duration;
-use winit::{
+use egui_winit::winit::{
     dpi::PhysicalPosition,
     event::{ElementState, MouseScrollDelta},
     keyboard::KeyCode,
 };
+use std::f32::consts::FRAC_PI_2;
+use std::time::Duration;
 
 #[rustfmt::skip]
 pub const OPENGL_TO_WGPU_MATRIX: cgmath::Matrix4<f32> = cgmath::Matrix4::new(

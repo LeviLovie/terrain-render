@@ -49,17 +49,36 @@ var geo_sampler: sampler;
 var<uniform> u_dimensions: Dimensions;
 
 fn smoothTintBlend(height: f32) -> vec3<f32> {
-    return mix(vec3<f32>(0.0, 0.0, 0.0),  // Blue (low)
-               vec3<f32>(1.0, 1.0, 1.0),  // Red (high)
+    return mix(vec3<f32>(1.0, 0.0, 0.0),
+               vec3<f32>(0.0, 1.0, 0.0),
                height);
+}
+
+fn bilinearSample(texture: texture_2d<f32>, smp: sampler, uv: vec2<f32>) -> f32 {
+    let tex_size = textureDimensions(texture);
+    let texel_size = 1.0 / vec2<f32>(tex_size);
+
+    let uv_texel = uv * vec2<f32>(tex_size);
+    let i_uv = floor(uv_texel);
+    let f_uv = fract(uv_texel);
+
+    let tl = textureSample(texture, smp, (i_uv + vec2<f32>(0.0, 0.0)) * texel_size).r;
+    let tr = textureSample(texture, smp, (i_uv + vec2<f32>(1.0, 0.0)) * texel_size).r;
+    let bl = textureSample(texture, smp, (i_uv + vec2<f32>(0.0, 1.0)) * texel_size).r;
+    let br = textureSample(texture, smp, (i_uv + vec2<f32>(1.0, 1.0)) * texel_size).r;
+
+    let t = mix(tl, tr, f_uv.x);
+    let b = mix(bl, br, f_uv.x);
+    return mix(t, b, f_uv.y);
 }
 
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     let base_color = textureSample(t_diffuse, s_diffuse, in.tex_coords).rgb;
     let height = textureSample(geo_texture, geo_sampler, in.tex_coords).r;
-    let tint_color = smoothTintBlend(height);
-    let final_color = mix(base_color, tint_color, 0.5);
+    let int_height = bilinearSample(geo_texture, geo_sampler, in.tex_coords);
+    let tint_color = smoothTintBlend(int_height);
+    let final_color = mix(base_color, tint_color, 0.1);
     return vec4<f32>(final_color, 1.0);
 }
 

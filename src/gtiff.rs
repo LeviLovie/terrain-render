@@ -1,11 +1,11 @@
-use gdal::Dataset;
-use tracing::{debug, debug_span, error, trace};
-use wgpu::{
+use egui_wgpu::wgpu::{
     Device, Queue, Texture, TextureDescriptor, TextureDimension, TextureFormat, TextureUsages,
 };
+use gdal::Dataset;
+use tracing::{debug, debug_span, error, trace};
 
-/// Returns Texture and buffer with pixel data from a GeoTIFF file
-pub fn load_geotiff_as_texture(device: &Device, queue: &Queue, path: &str) -> (Texture, Vec<f32>) {
+/// Returns Texture and not normalized buffer with pixel data from a GeoTIFF file
+pub fn load_geotiff_as_texture(device: &Device, queue: &Queue, path: &str) -> (Texture, Vec<f64>) {
     let span = debug_span!("gtiff_to_texture", path = path);
     let _enter = span.enter();
 
@@ -72,7 +72,7 @@ pub fn load_geotiff_as_texture(device: &Device, queue: &Queue, path: &str) -> (T
     // Create a wgpu texture
     let texture = device.create_texture(&TextureDescriptor {
         label: Some("GeoTIFF Texture"),
-        size: wgpu::Extent3d {
+        size: egui_wgpu::wgpu::Extent3d {
             width: width as u32,
             height: height as u32,
             depth_or_array_layers: 1,
@@ -90,12 +90,12 @@ pub fn load_geotiff_as_texture(device: &Device, queue: &Queue, path: &str) -> (T
     queue.write_texture(
         texture.as_image_copy(),
         bytemuck::cast_slice(&normalized_data), // Convert to bytes
-        wgpu::ImageDataLayout {
+        egui_wgpu::wgpu::ImageDataLayout {
             offset: 0,
             bytes_per_row: Some(width as u32 * std::mem::size_of::<f32>() as u32),
             rows_per_image: Some(height as u32),
         },
-        wgpu::Extent3d {
+        egui_wgpu::wgpu::Extent3d {
             width: width as u32,
             height: height as u32,
             depth_or_array_layers: 1,
@@ -103,5 +103,5 @@ pub fn load_geotiff_as_texture(device: &Device, queue: &Queue, path: &str) -> (T
     );
     debug!("Uploaded GeoTIFF data to GPU");
 
-    (texture, normalized_data)
+    (texture, buffer.data().to_vec())
 }

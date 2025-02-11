@@ -1,13 +1,14 @@
-use tracing::{debug, error, info, info_span, trace, warn};
-use winit::{
+use egui_winit::winit::{
     event::*,
     event_loop::EventLoop,
     keyboard::{KeyCode, PhysicalKey},
     window::WindowBuilder,
 };
+use tracing::{debug, error, info, info_span, trace, warn};
 
 pub mod camera;
 pub mod gtiff;
+pub mod gui;
 pub mod state;
 pub mod terrain;
 pub mod texture;
@@ -58,19 +59,22 @@ pub async fn run() {
     }
     let mut surface_configured = false;
     let mut last_render_time = std::time::Instant::now();
+    let mut egui_consumed = false;
 
     info!("Running event loop");
     let _ = event_loop.run(move |event, control_flow| match event {
         Event::DeviceEvent {
             event: DeviceEvent::MouseMotion{ delta, },
             .. // We're not using device_id currently
-        } => if state.mouse_pressed {
-            state.camera_controller.process_mouse(delta.0, delta.1)
+        } => {
+            if !egui_consumed && state.mouse_pressed {
+                state.camera_controller.process_mouse(delta.0, delta.1)
+            }
         }
         Event::WindowEvent {
             ref event,
             window_id,
-        } if window_id == state.window().id() => {
+        } if window_id == state.window().id() && !state.input(event) => {
             if !state.input(event) {
                 match event {
                     WindowEvent::CloseRequested
@@ -98,25 +102,25 @@ pub async fn run() {
                         let now = std::time::Instant::now();
                         let dt = now - last_render_time;
                         last_render_time = now;
-                        state.window.set_title(&format!(
-                            "Terrain Renderer - {:.2} FPS",
-                            1.0 / dt.as_secs_f64()
-                        ));
+                        state.status.delta = dt.as_micros();
+                        state.status.fps = 1_000_000.0 / dt.as_micros() as f32;
+                        state.status.fps_avg =
+                            0.95 * state.status.fps_avg + 0.05 * state.status.fps;
                         state.update(dt);
-
                         match state.render() {
                             Ok(_) => {}
 
-                            Err(wgpu::SurfaceError::Lost | wgpu::SurfaceError::Outdated) => {
-                                state.resize(state.size)
-                            }
+                            Err(
+                                egui_wgpu::wgpu::SurfaceError::Lost
+                                | egui_wgpu::wgpu::SurfaceError::Outdated,
+                            ) => state.resize(state.size),
 
-                            Err(wgpu::SurfaceError::OutOfMemory) => {
+                            Err(egui_wgpu::wgpu::SurfaceError::OutOfMemory) => {
                                 error!("OutOfMemory");
                                 control_flow.exit();
                             }
 
-                            Err(wgpu::SurfaceError::Timeout) => {
+                            Err(egui_wgpu::wgpu::SurfaceError::Timeout) => {
                                 warn!("Surface timeout")
                             }
                         }
@@ -124,6 +128,7 @@ pub async fn run() {
 
                     _ => {}
                 }
+                egui_consumed = state.egui.handle_input(&mut state.window, event);
             }
         }
         _ => {}

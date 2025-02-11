@@ -1,7 +1,11 @@
 use super::state::Vertex;
-use wgpu::Texture;
+use egui_wgpu::wgpu::Texture;
+use tracing::{debug, trace, trace_span};
 
-pub fn texture_to_vertices(texture: Texture, buffer: Vec<f32>) -> (Vec<Vertex>, Vec<u16>) {
+pub fn texture_to_vertices(texture: Texture, buffer: Vec<f64>) -> (Vec<Vertex>, Vec<u16>) {
+    let span = trace_span!("texture_to_vertices");
+    let _enter = span.enter();
+
     let mut vertices = Vec::new();
     let mut indices = Vec::new();
 
@@ -9,11 +13,15 @@ pub fn texture_to_vertices(texture: Texture, buffer: Vec<f32>) -> (Vec<Vertex>, 
     let width = size.width as f32;
     let height = size.height as f32;
 
+    let minimum_value = buffer.iter().cloned().fold(f64::INFINITY, f64::min);
+    debug!("Minimum value: {}", minimum_value);
+
     for y in 0..height as u32 {
         for x in 0..width as u32 {
-            let pixel = buffer[(y * width as u32 + x) as usize];
+            let pixel = (buffer[(y * width as u32 + x) as usize] - minimum_value) / 30.0;
+            trace!("Pixel value: {}", pixel);
             vertices.push(Vertex {
-                position: [x as f32, pixel * 25.0, y as f32],
+                position: [x as f32, pixel as f32, y as f32],
                 tex_coords: [x as f32 / width as f32, y as f32 / height as f32],
             });
         }

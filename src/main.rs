@@ -1,6 +1,5 @@
-use terrain::run;
+use gfx::run;
 
 fn main() {
-    println!("Hello, world!");
     pollster::block_on(run());
 }
